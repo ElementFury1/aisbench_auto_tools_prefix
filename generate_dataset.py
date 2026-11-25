@@ -1,5 +1,22 @@
 import logging
 from transformers import AutoTokenizer
+
+try:
+    from transformers import PreTrainedTokenizerFast as _FastTok
+except Exception:
+    _FastTok = None
+
+
+def _load_tokenizer(path):
+    # 兼容加载 tokenizer: 优先 PreTrainedTokenizerFast(绕过 AutoConfig), 失败再回退 AutoTokenizer.
+    # DeepSeek-V4 的 config.json 含 model_type=deepseek_v4, transformers 5.5.3 的 AutoConfig
+    # 处理其 rope_scaling 会崩溃, 故用 fast 路径绕过.
+    if _FastTok is not None:
+        try:
+            return _FastTok.from_pretrained(path)
+        except Exception:
+            pass
+    return AutoTokenizer.from_pretrained(path)
 from data_picker import *
 import os
 import random
@@ -15,7 +32,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 def create_dataset(tokenizer_path: str, input_len: int, number: int, prefix_flag):
 
     logging.info(f"加载tokenizer: {tokenizer_path}")
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    tokenizer = _load_tokenizer(tokenizer_path)
 
     output_samples = []
     attempts = 0
@@ -90,7 +107,7 @@ def generate_unique_tokens(tokenizer_path, seed, n, number):
     torch.manual_seed(seed)
 
     # 加载 tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    tokenizer = _load_tokenizer(tokenizer_path)
 
     # 获取词表大小
     vocab_size = len(tokenizer)
@@ -227,7 +244,7 @@ def create_multi_prefix_dataset(tokenizer_path: str, input_len: int, number: int
             if long_texts is None:
                 logging.error("生成数据集失败，请清空picked ids")
                 exit(0)
-            tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+            tokenizer = _load_tokenizer(tokenizer_path)
             dataset = []
             pbar = tqdm(total=number, desc="Truncating to variable lengths", unit="row") if tqdm else None
             for i, rl in enumerate(real_lens):
@@ -341,7 +358,7 @@ def _create_prefix_dataset_variable(tokenizer_path, input_len, number, save_path
         logging.error("生成后缀数据集失败，请清空picked ids")
         exit(0)
 
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    tokenizer = _load_tokenizer(tokenizer_path)
 
     # 逐条拼接
     dataset = []
