@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# container/run.sh —— 一次压测 = 一个临时 benchmark 容器（跑完即删）
+# container_run.sh —— 一次压测 = 一个临时 benchmark 容器（跑完即删）
 #
-# 用法（在仓库任意位置执行）：
-#   bash container/run.sh --input_len 2048 --output_len 2048 --data_num 160 --concurrency 40 --request_rate 10
-#   bash container/run.sh --dataset_type prefix_cache --repeat_rate 0.5 --prefix_test --dp 2 ...
+# 用法（在仓库根目录执行，或用绝对路径调用本脚本）：
+#   bash container_run.sh --input_len 2048 --output_len 2048 --data_num 160 --concurrency 40 --request_rate 10
+#   bash container_run.sh --dataset_type prefix_cache --repeat_rate 0.5 --prefix_test --dp 2 ...
 #
 # 参数原样透传给 aisbench_test.py。
 # 路径（DATASET_PATH / OUTPUT_DIR / MODEL_PATH）全部由仓库根目录的 config.py 决定，
@@ -21,14 +21,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$SCRIPT_DIR"   # 脚本就放在仓库根目录
 
 IMAGE="${IMAGE:-ghcr.io/aisbench/aisbench_benchmark:v3.1-20261013-master-ubuntu24.04-py312-aarch64}"
 RUN_ROOT="${RUN_ROOT:-$HOME/aisbench_runs}"
 OWNER="${OWNER:-$(whoami)}"
 
-die() { echo "[run.sh] ERROR: $*" >&2; exit 1; }
-info() { echo "[run.sh] $*"; }
+die() { echo "[container_run.sh] ERROR: $*" >&2; exit 1; }
+info() { echo "[container_run.sh] $*"; }
 
 [ -f "$REPO_ROOT/config.py" ] || die "找不到 $REPO_ROOT/config.py"
 [ -f "$REPO_ROOT/aisbench_test.py" ] || die "找不到 $REPO_ROOT/aisbench_test.py"
@@ -88,7 +88,7 @@ done
 # 容器里 aisbench 源码在 /benchmark（镜像内可编辑安装），覆盖本次副本的 WORK_PATH
 cat >> "$RUN_DIR/tools/config.py" <<'PY'
 
-# ---- container/run.sh 追加：容器内 aisbench 源码固定为 /benchmark ----
+# ---- container_run.sh 追加：容器内 aisbench 源码固定为 /benchmark ----
 import os as _os
 WORK_PATH = _os.environ.get("AISBENCH_WORK_PATH", "/benchmark")
 PY
@@ -98,7 +98,7 @@ if [ "${WORKDIR_ISOLATE:-0}" = "1" ]; then
     OUTPUT_DIR="$OUTPUT_DIR/run_${TS}_${SAFE_OWNER}"
     cat >> "$RUN_DIR/tools/config.py" <<PY
 
-# ---- container/run.sh 追加：本次压测独立的实验根目录 ----
+# ---- container_run.sh 追加：本次压测独立的实验根目录 ----
 OUTPUT_DIR = "$OUTPUT_DIR"
 PY
 fi
